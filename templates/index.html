@@ -1,0 +1,389 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Battleship Generator</title>
+
+    <style>
+        body {
+            background: #101827;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 24px;
+        }
+
+        #configuration {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1b293b;
+            border-radius: 8px;
+        }
+
+        .board-size,
+        .ship-row {
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            text-align: left;
+        }
+
+        input {
+            box-sizing: border-box;
+            min-width: 0;
+            padding: 8px;
+        }
+
+        input[type="number"] {
+            width: 90px;
+        }
+
+        input[type="color"] {
+            width: 56px;
+            height: 38px;
+            padding: 3px;
+        }
+
+        .ship-name {
+            width: 180px;
+        }
+
+        .boards {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 32px;
+        }
+
+        .board-panel h2 {
+            margin-bottom: 8px;
+        }
+
+        .shape-editor {
+            display: grid;
+            grid-template-columns: repeat(10, 28px);
+            gap: 3px;
+            margin: 10px auto;
+            width: fit-content;
+        }
+
+        .shape-cell {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            background: #26364c;
+            border: 1px solid #52647a;
+        }
+
+        .shape-cell.selected {
+            background: #3b82f6;
+        }
+
+        .shape-panel {
+            flex-basis: 100%;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 16px;
+            cursor: pointer;
+        }
+
+        #configuration button[type="submit"] {
+            margin-top: 12px;
+        }
+
+        .board {
+            display: grid;
+            gap: 4px;
+            width: fit-content;
+            margin: 30px auto;
+            overflow: auto;
+        }
+
+        .cell {
+            width: 35px;
+            height: 35px;
+            background: #26364c;
+            border-radius: 4px;
+        }
+
+        .axis-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c7d2e0;
+            font-size: 13px;
+        }
+
+        .row-label {
+            width: 24px;
+        }
+
+        .column-label {
+            width: 35px;
+            height: 24px;
+        }
+
+        @media (max-width: 520px) {
+            body {
+                padding: 12px;
+            }
+
+            #configuration {
+                padding: 14px;
+            }
+
+            .ship-row {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Battleship Ship Generator</h1>
+
+    <form id="configuration">
+        <h2>Board size</h2>
+        <div class="board-size">
+            <label>
+                Width
+                <input id="board-width" type="number" min="1" max="30" value="10" required>
+            </label>
+            <label>
+                Height
+                <input id="board-height" type="number" min="1" max="30" value="10" required>
+            </label>
+        </div>
+
+        <h2>Ships</h2>
+        <div id="ships"></div>
+        <button id="add-ship" type="button">Add ship</button>
+        <br>
+        <button type="submit">Randomize Ships</button>
+        <p id="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <div class="boards">
+        <section class="board-panel">
+            <h2>Ground</h2>
+            <div id="ground-board" class="board"></div>
+        </section>
+        <section class="board-panel">
+            <h2>Air</h2>
+            <div id="air-board" class="board"></div>
+        </section>
+    </div>
+
+    <script>
+        const form = document.getElementById("configuration");
+        const shipsElement = document.getElementById("ships");
+        const statusElement = document.getElementById("status");
+
+        function addShip(name = "", size = 1, color = "#3b82f6") {
+            const row = document.createElement("div");
+            row.className = "ship-row";
+
+            const nameLabel = document.createElement("label");
+            nameLabel.append("Name");
+            const nameInput = document.createElement("input");
+            nameInput.className = "ship-name";
+            nameInput.type = "text";
+            nameInput.maxLength = 40;
+            nameInput.required = true;
+            nameInput.value = name;
+            nameLabel.appendChild(nameInput);
+
+            const sizeLabel = document.createElement("label");
+            sizeLabel.append("Size");
+            const sizeInput = document.createElement("input");
+            sizeInput.type = "number";
+            sizeInput.min = "1";
+            sizeInput.max = "30";
+            sizeInput.required = true;
+            sizeInput.value = size;
+            sizeLabel.appendChild(sizeInput);
+
+            const colorLabel = document.createElement("label");
+            colorLabel.append("Color");
+            const colorInput = document.createElement("input");
+            colorInput.type = "color";
+            colorInput.value = color;
+            colorLabel.appendChild(colorInput);
+
+            const hoverLabel = document.createElement("label");
+            hoverLabel.append("Hover ship");
+            const hoverInput = document.createElement("input");
+            hoverInput.className = "hover-ship";
+            hoverInput.type = "checkbox";
+            hoverLabel.appendChild(hoverInput);
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.textContent = "Remove";
+            removeButton.addEventListener("click", () => row.remove());
+
+            const shapeButton = document.createElement("button");
+            shapeButton.type = "button";
+            shapeButton.textContent = "Custom shape";
+
+            const shapePanel = document.createElement("div");
+            shapePanel.className = "shape-panel";
+            shapePanel.hidden = true;
+            const shapeGrid = document.createElement("div");
+            shapeGrid.className = "shape-editor";
+            const shapeCount = document.createElement("span");
+            const shapeDone = document.createElement("button");
+            shapeDone.type = "button";
+            shapeDone.textContent = "Done";
+            shapePanel.append(shapeGrid, shapeCount, document.createElement("br"), shapeDone);
+
+            let customShape = null;
+            shapeButton.addEventListener("click", () => {
+                shapePanel.hidden = !shapePanel.hidden;
+                if (shapePanel.hidden) return;
+                const selected = new Set((customShape || Array.from({ length: Number(sizeInput.value) }, (_, i) => [i % 10, Math.floor(i / 10)]))
+                    .map(([x, y]) => `${x},${y}`));
+                shapeGrid.replaceChildren();
+                for (let y = 0; y < 10; y++) {
+                    for (let x = 0; x < 10; x++) {
+                        const cell = document.createElement("button");
+                        cell.type = "button";
+                        cell.className = "shape-cell";
+                        const key = `${x},${y}`;
+                        if (selected.has(key)) cell.classList.add("selected");
+                        cell.setAttribute("aria-label", `Square ${x + 1}, ${y + 1}`);
+                        cell.addEventListener("click", () => {
+                            if (selected.has(key)) {
+                                selected.delete(key);
+                                cell.classList.remove("selected");
+                            } else if (selected.size < 30) {
+                                selected.add(key);
+                                cell.classList.add("selected");
+                            }
+                            shapeCount.textContent = `${selected.size} squares selected`;
+                        });
+                        shapeGrid.appendChild(cell);
+                    }
+                }
+                shapeCount.textContent = `${selected.size} squares selected`;
+                shapeDone.onclick = () => {
+                    if (selected.size === 0) {
+                        shapeCount.textContent = "Select at least one square.";
+                        return;
+                    }
+                    customShape = Array.from(selected, (key) => key.split(",").map(Number));
+                    sizeInput.value = customShape.length;
+                    shapePanel.hidden = true;
+                };
+            });
+            sizeInput.addEventListener("input", () => {
+                customShape = null;
+            });
+            row._getShape = () => customShape;
+
+            row.append(nameLabel, sizeLabel, shapeButton, colorLabel, hoverLabel, removeButton, shapePanel);
+            shipsElement.appendChild(row);
+        }
+
+        document.getElementById("add-ship").addEventListener("click", () => addShip());
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            statusElement.textContent = "Generating board...";
+
+            const ships = Array.from(shipsElement.querySelectorAll(".ship-row"), (row) => {
+                return {
+                    name: row.querySelector(".ship-name").value.trim(),
+                    size: Number(row.querySelector('input[type="number"]').value),
+                    color: row.querySelector('input[type="color"]').value,
+                    hover: row.querySelector(".hover-ship").checked,
+                    shape: row._getShape ? row._getShape() : null
+                };
+            });
+
+            try {
+                const response = await fetch("/api/board", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        width: Number(document.getElementById("board-width").value),
+                        height: Number(document.getElementById("board-height").value),
+                        ships
+                    })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Unable to generate the board.");
+                }
+
+                function renderBoard(elementId, board) {
+                    const boardElement = document.getElementById(elementId);
+                    boardElement.replaceChildren();
+                    boardElement.style.display = "grid";
+                    boardElement.style.gridTemplateColumns = `24px repeat(${data.width}, 35px)`;
+                    boardElement.style.gap = "4px";
+                    boardElement.style.width = "fit-content";
+                    boardElement.style.margin = "0 auto 30px";
+                    boardElement.style.overflow = "auto";
+
+                    const corner = document.createElement("div");
+                    corner.className = "axis-label";
+                    boardElement.appendChild(corner);
+                    for (let x = 1; x <= data.width; x++) {
+                        const label = document.createElement("div");
+                        label.className = "axis-label column-label";
+                        label.textContent = x;
+                        boardElement.appendChild(label);
+                    }
+
+                    function rowName(index) {
+                        let name = "";
+                        for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) {
+                            name = String.fromCharCode(65 + (value - 1) % 26) + name;
+                        }
+                        return name;
+                    }
+
+                    for (let y = 0; y < board.length; y++) {
+                        const rowLabel = document.createElement("div");
+                        rowLabel.className = "axis-label row-label";
+                        rowLabel.textContent = rowName(y);
+                        boardElement.appendChild(rowLabel);
+                        const boardRow = board[y];
+                        for (const cell of boardRow) {
+                            const square = document.createElement("div");
+                            square.className = "cell";
+                            if (cell !== null) {
+                                square.style.backgroundColor = data.colors[cell];
+                                square.title = cell;
+                            }
+                            boardElement.appendChild(square);
+                        }
+                    }
+                }
+                renderBoard("ground-board", data.ground_board);
+                renderBoard("air-board", data.air_board);
+                statusElement.textContent = "";
+            } catch (error) {
+                statusElement.textContent = error.message;
+            }
+        });
+
+        form.requestSubmit();
+    </script>
+</body>
+</html>
